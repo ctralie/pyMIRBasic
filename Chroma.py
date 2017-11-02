@@ -74,6 +74,8 @@ def get1DPeaks(X, doParabolic=True):
         p = 0.5*(alpha - gamma)/(alpha-2*beta+gamma)
         idx = np.array(idx, dtype = np.float64) + p
         vals = beta - 0.25*(alpha - gamma)*p
+    else:
+        idx = np.array(idx, dtype = np.float64)
     return (idx, vals)        
 
 def unitMaxNorm(x):
@@ -83,7 +85,8 @@ def unitMaxNorm(x):
     return x/m
 
 def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFreq = 5000, 
-            bandSplitFreq = 500, refFreq = 440, NHarmonics = 0, windowSize = 1):
+            bandSplitFreq = 500, refFreq = 440, NHarmonics = 0, windowSize = 1,
+            doParabolic = True, squareMags = False):
     """
     My implementation of HPCP
     :param XAudio: The raw audio
@@ -97,6 +100,9 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
     :param refFreq: Reference frequency (440hz default)
     :param NHarmonics: The number of harmonics to contribute to each semitone (default 0)
     :param windowSize: Size in semitones of window used for weighting
+    :param doParabolic: Do parabolic interpolation when finding peaks
+    :param squareMags: Whether to square the linear magnitudes of the contributions
+        from the spectrogram
     """
     #Squared cosine weight type
 
@@ -129,12 +135,17 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         _,_,S = spectrogram(XAudio[i*hopSize:i*hopSize+winSize], nperseg=winSize, window='blackman')
         S = S.flatten()
         #Do parabolic interpolation on each peak
-        (pidxs, pvals) = get1DPeaks(S, doParabolic=True)
+        (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic)
         pidxs /= float(winSize) #Normalize to be fraction of sampling frequency
         #Figure out number of semitones from each unrolled bin
-        delta = np.abs(np.log2(pidxs[:, None]/freqsNorm[None, :]))*NChromaBins
-        weights = np.cos((delta/windowSize)*np.pi/2)*(delta <= windowSize)
-        hpcpUnrolled = np.sum(pvals[:, None]*weights, 0)
+        ratios = pidxs[:, None]/freqsNorm[None, :]
+        ratios[ratios == 0] = 1
+        delta = np.abs(np.log2(ratios))*NChromaBins
+        weights = (np.cos((delta/windowSize)*np.pi/2))*(delta <= windowSize)
+        pvals = pvals[:, None]*weights
+        if squareMags:
+            pvals = pvals**2
+        hpcpUnrolled = np.sum(pvals, 0)
         #Make hpcp low and hpcp high
         hpcplow = hpcpUnrolled[freqs <= minFreq]
         binIdxLow = binIdx[freqs <= minFreq]
@@ -144,14 +155,13 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         binIdxHigh = binIdx[freqs > minFreq]
         hpcphigh = sparse.coo_matrix((hpcphigh, (np.zeros(binIdxHigh.size), binIdxHigh)), 
             shape=(1, NChromaBins)).todense()
-        #unitMax normalization of low and hi individually, then sum
+        #unitMax normalization of low and high individually, then sum
         hpcp = unitMaxNorm(hpcplow) + unitMaxNorm(hpcphigh)
         hpcp = unitMaxNorm(hpcp)
         hpcp = np.array(hpcp).flatten()
         H.append(hpcp.tolist())
     H = np.array(H)
     H = H.T
-    print("H.shape = ", H.shape)
     return H
 
 
@@ -197,7 +207,7 @@ if __name__ == '__main__':
     H = getHPCPEssentia(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins)
     print("Elapsed time Essentia: %g"%(time.time() - tic))
     tic = time.time()
-    H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 3)
+    H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 1)
     print("Elapsed time mine: %g"%(time.time() - tic))
     M = min(H.shape[1], H2.shape[1])
     H = H[:, 0:M]
@@ -212,6 +222,6 @@ if __name__ == '__main__':
     plt.imshow(H2, cmap = 'afmhot', interpolation = 'none', aspect = 'auto')
     plt.title("My HPCP")
     plt.subplot(313)
-    plt.imshow(H2 - H, cmap = 'afmhot', interpolation = 'none', aspect = 'auto')
-    plt.title("Difference")
+    plt.imshow(Cens, cmap = 'afmhot', interpolation = 'none', aspect = 'auto')
+    plt.title("Cens")
     plt.show()
