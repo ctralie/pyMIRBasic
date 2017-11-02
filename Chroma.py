@@ -37,7 +37,6 @@ def getHPCPEssentia(XAudio, Fs, winSize, hopSize, squareRoot=False, NChromaBins=
     import essentia
     from essentia import Pool, array
     import essentia.standard as ess
-    print("Getting HPCP Essentia...")
     spectrum = ess.Spectrum()
     window = ess.Windowing(size=winSize, type='hann')
     spectralPeaks = ess.SpectralPeaks()
@@ -136,12 +135,16 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
     freqs = freqs[idx]
     binIdx = binIdx[idx]
     freqsNorm = freqs/Fs #Normalize to be fraction of sampling frequency
+    maxFreqIdx = int(np.ceil(winSize*float(maxFreq)/Fs))
+    minFreqIdx = int(np.floor(winSize*float(minFreq)/Fs))
 
     #Do STFT window by window
     H = []
     for i in range(NWin):
         _,_,S = spectrogram(XAudio[i*hopSize:i*hopSize+winSize], nperseg=winSize, window='blackman')
         S = S.flatten()
+        S = S[0:maxFreqIdx]
+        S[0:minFreqIdx+1] = 0
         #Do parabolic interpolation on each peak
         (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic, MaxPeaks=MaxPeaks)
         pidxs /= float(winSize) #Normalize to be fraction of sampling frequency
@@ -205,7 +208,8 @@ if __name__ == '__main__':
     import time
     from AudioIO import getAudio
     XAudio, Fs = getAudio("piano-chrom.wav")
-    w = int(np.floor(Fs/4)*2)
+    #XAudio, Fs = getAudio("MJ.wav")
+    #XAudio = XAudio[Fs*10:Fs*15]
 
     hopSize = 512#8192
     winSize = hopSize*4#8192#16384
