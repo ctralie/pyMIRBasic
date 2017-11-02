@@ -5,6 +5,7 @@ from scipy.signal import spectrogram
 import scipy.sparse as sparse
 
 HPCP_PRECISION = 1e-5
+STFT_MIN = 1e-10
 
 #Norm-preserving square root (as in "chrompwr.m" by Ellis)
 def sqrtCompress(X):
@@ -141,25 +142,31 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
     #Do STFT window by window
     H = []
     for i in range(NWin):
+        #Compute spectrogram and pull out relevant portions
         _,_,S = spectrogram(XAudio[i*hopSize:i*hopSize+winSize], nperseg=winSize, window='blackman')
         S = S.flatten()
         S = S[0:maxFreqIdx]
-        minVal = 1.0
-        if np.sum(S) > 0:
-            minVal = np.min(S[S > 0])
-        S = np.log(S/minVal)
+        
+        #Convert to dB
+        S = np.maximum(S, STFT_MIN)
+        S = np.log(S)
+        
         #Do parabolic interpolation on each peak
         (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic, MaxPeaks=MaxPeaks)
         pidxs /= float(winSize) #Normalize to be fraction of sampling frequency
+        
         #Figure out number of semitones from each unrolled bin
         ratios = pidxs[:, None]/freqsNorm[None, :]
         ratios[ratios == 0] = 1
         delta = np.abs(np.log2(ratios))*NChromaBins
+        
+        #Weight by squared cosine window
         weights = (np.cos((delta/windowSize)*np.pi/2)**2)*(delta <= windowSize)
         pvals = pvals[:, None]*weights
         if squareMags:
             pvals = pvals**2
         hpcpUnrolled = np.sum(pvals, 0)
+        
         #Make hpcp low and hpcp high
         hpcplow = hpcpUnrolled[freqs <= minFreq]
         binIdxLow = binIdx[freqs <= minFreq]
@@ -169,6 +176,7 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         binIdxHigh = binIdx[freqs > minFreq]
         hpcphigh = sparse.coo_matrix((hpcphigh, (np.zeros(binIdxHigh.size), binIdxHigh)), 
             shape=(1, NChromaBins)).todense()
+        
         #unitMax normalization of low and high individually, then sum
         hpcp = unitMaxNorm(hpcplow) + unitMaxNorm(hpcphigh)
         hpcp = unitMaxNorm(hpcp)
