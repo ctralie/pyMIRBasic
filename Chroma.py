@@ -92,7 +92,7 @@ def unitMaxNorm(x):
 
 def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFreq = 5000, 
             bandSplitFreq = 500, refFreq = 440, NHarmonics = 0, windowSize = 1,
-            MaxPeaks = -1, doParabolic = True, squareMags = False):
+            MaxPeaks = 100, doParabolic = True, squareMags = True):
     """
     My implementation of HPCP
     :param XAudio: The raw audio
@@ -144,7 +144,10 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         _,_,S = spectrogram(XAudio[i*hopSize:i*hopSize+winSize], nperseg=winSize, window='blackman')
         S = S.flatten()
         S = S[0:maxFreqIdx]
-        S[0:minFreqIdx+1] = 0
+        minVal = 1.0
+        if np.sum(S) > 0:
+            minVal = np.min(S[S > 0])
+        S = np.log(S/minVal)
         #Do parabolic interpolation on each peak
         (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic, MaxPeaks=MaxPeaks)
         pidxs /= float(winSize) #Normalize to be fraction of sampling frequency
@@ -152,7 +155,7 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         ratios = pidxs[:, None]/freqsNorm[None, :]
         ratios[ratios == 0] = 1
         delta = np.abs(np.log2(ratios))*NChromaBins
-        weights = (np.cos((delta/windowSize)*np.pi/2))*(delta <= windowSize)
+        weights = (np.cos((delta/windowSize)*np.pi/2)**2)*(delta <= windowSize)
         pvals = pvals[:, None]*weights
         if squareMags:
             pvals = pvals**2
@@ -213,7 +216,7 @@ if __name__ == '__main__':
 
     hopSize = 512#8192
     winSize = hopSize*4#8192#16384
-    NChromaBins = 36
+    NChromaBins = 12
 
     tic = time.time()
     H = getHPCPEssentia(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins)
