@@ -1,6 +1,4 @@
-"""
-Audio Loading
-"""
+#Audio loading
 import numpy as np
 import subprocess
 from scipy.io import wavfile
@@ -17,7 +15,7 @@ def getAudio(filename):
     toload = filename
     tempfilename = ""
     if not filename[-3::] == 'wav':
-        tempfilename = "%s.wav"%filename[0:-4]
+        tempfilename = '%s.wav'%filename[0:-4]
         if os.path.exists(tempfilename):
             os.remove(tempfilename)
         subprocess.call(["avconv", "-i", filename, "-ar", "44100", tempfilename])
@@ -32,7 +30,7 @@ def getAudio(filename):
     return (XAudio, Fs)
 
 def getAudioLibrosa(filename):
-    """
+    r"""
     Use librosa to load audio
     :param filename: Path to audio file
     :return (XAudio, Fs): Audio in samples, sample rate
