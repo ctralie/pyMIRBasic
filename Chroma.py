@@ -53,12 +53,14 @@ def getHPCPEssentia(XAudio, Fs, winSize, hopSize, squareRoot=False, NChromaBins=
         H = sqrtCompress(H)
     return H
 
-def get1DPeaks(X, doParabolic=True):
+def get1DPeaks(X, doParabolic=True, MaxPeaks = -1):
     """
     Find peaks in intermediate locations using parabolic interpolation
     :param X: A 1D array in which to find interpolated peaks
     :param doParabolic: Whether to use parabolic interpolation to get refined \
         peak estimates (default True)
+    :param MaxPeaks: The maximum number of peaks to consider\
+        (default -1, consider all peaks)
     :return (bins, freqs): p is signed interval to the left/right of the max
         at which the true peak resides, and b is the peak value
     """
@@ -76,6 +78,11 @@ def get1DPeaks(X, doParabolic=True):
         vals = beta - 0.25*(alpha - gamma)*p
     else:
         idx = np.array(idx, dtype = np.float64)
+    if MaxPeaks > 0:
+        if len(vals) > MaxPeaks:
+            idxx = np.argsort(-vals)
+            vals = vals[idxx[0:MaxPeaks]]
+            idx = idx[idxx[0:MaxPeaks]]
     return (idx, vals)        
 
 def unitMaxNorm(x):
@@ -86,7 +93,7 @@ def unitMaxNorm(x):
 
 def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFreq = 5000, 
             bandSplitFreq = 500, refFreq = 440, NHarmonics = 0, windowSize = 1,
-            doParabolic = True, squareMags = False):
+            MaxPeaks = -1, doParabolic = True, squareMags = False):
     """
     My implementation of HPCP
     :param XAudio: The raw audio
@@ -100,6 +107,7 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
     :param refFreq: Reference frequency (440hz default)
     :param NHarmonics: The number of harmonics to contribute to each semitone (default 0)
     :param windowSize: Size in semitones of window used for weighting
+    :param MaxPeaks: The maximum number of peaks to include per window
     :param doParabolic: Do parabolic interpolation when finding peaks
     :param squareMags: Whether to square the linear magnitudes of the contributions
         from the spectrogram
@@ -135,7 +143,7 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         _,_,S = spectrogram(XAudio[i*hopSize:i*hopSize+winSize], nperseg=winSize, window='blackman')
         S = S.flatten()
         #Do parabolic interpolation on each peak
-        (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic)
+        (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic, MaxPeaks=MaxPeaks)
         pidxs /= float(winSize) #Normalize to be fraction of sampling frequency
         #Figure out number of semitones from each unrolled bin
         ratios = pidxs[:, None]/freqsNorm[None, :]
@@ -207,7 +215,7 @@ if __name__ == '__main__':
     H = getHPCPEssentia(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins)
     print("Elapsed time Essentia: %g"%(time.time() - tic))
     tic = time.time()
-    H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 1)
+    H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 1, MaxPeaks = 10)
     print("Elapsed time mine: %g"%(time.time() - tic))
     M = min(H.shape[1], H2.shape[1])
     H = H[:, 0:M]
