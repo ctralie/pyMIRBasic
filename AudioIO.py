@@ -12,6 +12,7 @@ def getAudio(filename):
     :param filename: Path to audio file
     :return (XAudio, Fs): Audio in samples, sample rate
     """
+    import os
     toload = filename
     tempfilename = ""
     if not filename[-3::] == 'wav':
