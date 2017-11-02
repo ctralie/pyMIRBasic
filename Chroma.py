@@ -93,7 +93,7 @@ def unitMaxNorm(x):
 
 def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFreq = 5000, 
             bandSplitFreq = 500, refFreq = 440, NHarmonics = 0, windowSize = 1,
-            MaxPeaks = 100, doParabolic = True, squareMags = True):
+            MaxPeaks = 100, doParabolic = True, dodB = False, squareMags = True):
     """
     My implementation of HPCP
     :param XAudio: The raw audio
@@ -109,6 +109,7 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
     :param windowSize: Size in semitones of window used for weighting
     :param MaxPeaks: The maximum number of peaks to include per window
     :param doParabolic: Do parabolic interpolation when finding peaks
+    :param dodB: Whether to use dB instead of linear magnitudes (default False)
     :param squareMags: Whether to square the linear magnitudes of the contributions
         from the spectrogram
     """
@@ -147,9 +148,10 @@ def getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = 36, minFreq = 40, maxFre
         S = S.flatten()
         S = S[0:maxFreqIdx]
         
-        #Convert to dB
-        S = np.maximum(S, STFT_MIN)
-        S = np.log(S)
+        if dodB:
+            #Convert to dB
+            S = np.maximum(S, STFT_MIN)
+            S = np.log(S)
         
         #Do parabolic interpolation on each peak
         (pidxs, pvals) = get1DPeaks(S, doParabolic=doParabolic, MaxPeaks=MaxPeaks)
@@ -218,19 +220,20 @@ if __name__ == '__main__':
     """
     import time
     from AudioIO import getAudio
+    import cProfile
     XAudio, Fs = getAudio("piano-chrom.wav")
     #XAudio, Fs = getAudio("MJ.wav")
     #XAudio = XAudio[Fs*10:Fs*15]
 
     hopSize = 512#8192
-    winSize = hopSize*4#8192#16384
+    winSize = 8192#16384
     NChromaBins = 12
 
     tic = time.time()
     H = getHPCPEssentia(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins)
     print("Elapsed time Essentia: %g"%(time.time() - tic))
     tic = time.time()
-    H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 1, MaxPeaks = 10)
+    cProfile.run('H2 = getHPCP(XAudio, Fs, winSize, hopSize, NChromaBins = NChromaBins, windowSize = 1, MaxPeaks = 10)')
     print("Elapsed time mine: %g"%(time.time() - tic))
     M = min(H.shape[1], H2.shape[1])
     H = H[:, 0:M]
