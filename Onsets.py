@@ -69,6 +69,10 @@ def getBeats(XAudio, Fs, TempoBias, hopSize, filename = ""):
     isn't specified, use the madmom RNN+DBN implementation
     :param XAudio: Flat numpy array of audio samples
     :param Fs: Sample rate
+    :param TempoBias: If 0, use Degara if a filename isn't\
+        specified, or Madmom if a filename is specified.\
+        If > 0, use Ellis dynamic programming\
+        If < 0, return constant intervals at |hopSize*TempoBias|
     :param hopSize: Hop size of each onset function value
     :param filename: Path to audio file
     :returns (tempo, beats): Average tempo, numpy array
@@ -78,6 +82,11 @@ def getBeats(XAudio, Fs, TempoBias, hopSize, filename = ""):
         if len(filename) == 0:
             return getDegaraOnsets(XAudio, Fs, hopSize)
         return getRNNDBNOnsets(filename, Fs, hopSize)
+    elif TempoBias < 0:
+        tempo = np.abs(TempoBias*hopSize/float(Fs))
+        N = int(np.floor(XAudio.size/hopSize))
+        beats = np.arange(0, N, -TempoBias)
+        return (tempo, beats)
     try:
         import librosa
         return librosa.beat.beat_track(XAudio, Fs, start_bpm = TempoBias, hop_length = hopSize)
