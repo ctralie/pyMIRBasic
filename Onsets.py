@@ -83,7 +83,7 @@ def getBeats(XAudio, Fs, TempoBias, hopSize, filename = ""):
             return getDegaraOnsets(XAudio, Fs, hopSize)
         return getRNNDBNOnsets(filename, Fs, hopSize)
     elif TempoBias < 0:
-        tempo = np.abs(TempoBias*hopSize/float(Fs))
+        tempo = 60.0/np.abs(TempoBias*hopSize/float(Fs))
         N = int(np.floor(XAudio.size/hopSize))
         beats = np.arange(0, N, -TempoBias)
         return (tempo, beats)
