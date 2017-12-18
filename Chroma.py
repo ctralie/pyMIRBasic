@@ -43,7 +43,7 @@ def getHPCPEssentia(XAudio, Fs, winSize, hopSize, squareRoot=False, NChromaBins=
     spectralPeaks = ess.SpectralPeaks()
     hpcp = ess.HPCP(size=NChromaBins, harmonics=NHarmonics)
     H = []
-    for frame in ess.FrameGenerator(XAudio, frameSize=winSize, hopSize=hopSize, startFromZero=True):
+    for frame in ess.FrameGenerator(array(XAudio), frameSize=winSize, hopSize=hopSize, startFromZero=True):
         S = spectrum(window(frame))
         freqs, mags = spectralPeaks(S)
         H.append(hpcp(freqs, mags))
