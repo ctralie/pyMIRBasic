@@ -139,7 +139,7 @@ def getMFCCsLibrosa(XAudio, Fs, winSize, hopSize = 512, NBands = 40, fmax = 8000
     #    eql = ((fsq/ftmp)**2)*((fsq + 1.44e6)/(fsq + 9.61e6))
 
     X = M.dot(np.abs(S))
-    X = librosa.core.logamplitude(X)
+    X = librosa.core.amplitude_to_db(X)
     X = np.dot(librosa.filters.dct(NMFCC, X.shape[0]), X) #Make MFCC
     #Do liftering
     coeffs = np.arange(NMFCC)**lifterexp
